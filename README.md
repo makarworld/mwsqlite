@@ -1,5 +1,11 @@
 Library for interacting with the SQLite database.
 
+Installation:
+
+```bash
+pip install mwsqlite
+```
+
 Example:
 
 ```python
