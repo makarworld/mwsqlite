@@ -92,5 +92,6 @@ TODO:
 - [x] MWBase.table("name").get_one(...)
 - [x] clear Table func
 - [x] class Where
+- [x] class Order (ASC, DESC)
 
 

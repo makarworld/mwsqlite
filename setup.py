@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 """
 
 
-version = '0.1.0'
+version = '1.0.0'
 
 with open("README.md", "r") as f:
     long_description = f.read()
@@ -25,7 +25,7 @@ setup(
     description="Simply python library for interact with (EOSIO) WAX blockchain",
 
     packages=['mwsqlite'],
-    install_requires=['requests', 'sqlite3'],
+    install_requires=[],
 
     license='MIT License',
     long_description=long_description,
