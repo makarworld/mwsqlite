@@ -3,7 +3,7 @@ Library for interacting with the SQLite database.
 Example:
 
 ```python
-from mwsqlite import MWBase
+from mwsqlite import MWBase, Where, Order, DESC, ASC
 
 # create database object (1)
 base = MWBase(
@@ -54,25 +54,30 @@ print(user.age)
 
 user.delete()
 
-
 user = base.users.get_one(name="Jane", age=18)
 print(user)
 # None
 
-
-
-
 # get many users from database
 
 for i in range(3):
-    base.users.add(first_name="John")
+    base.users.add(first_name="John", age=18 + i)
 
-users = base.users.get(name="John")
+users = base.users.get(
+    Order(age=DESC), 
+    name="John"
+)
 print(len(users))
 # 3
 
 print(users)
 # [{'first_name': 'Jane', 'last_name': '', 'age': 0, 'info': {}, 'is_admin': False, 'list_rewards': []}, ...]
+
+for user in users:
+    print(user.age)
+    # 20
+    # 19
+    # 18
 
 ```
 
