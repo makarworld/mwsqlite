@@ -28,7 +28,7 @@ def ensure_connection(func):
     
 def check_kwargs(kwargs):
     for k, v in kwargs.items():
-        if isinstance(v, Row) or isinstance(v[i], Struct):
+        if isinstance(v, Row) or isinstance(v, Struct):
             kwargs[k] = v.dict()
 
         elif isinstance(v, list):
