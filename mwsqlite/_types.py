@@ -48,6 +48,9 @@ class Struct:
     
     def __str__(self):
         return self.__dict__.__str__()
+    
+    def dict(self):
+        return self.__dict__ 
 
     def __getattr__(self, item):
         return None

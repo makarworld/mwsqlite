@@ -28,12 +28,12 @@ def ensure_connection(func):
     
 def check_kwargs(kwargs):
     for k, v in kwargs.items():
-        if isinstance(v, Row):
+        if isinstance(v, Row) or isinstance(v[i], Struct):
             kwargs[k] = v.dict()
 
         elif isinstance(v, list):
             for i in range(len(v)):
-                if isinstance(v[i], Row):
+                if isinstance(v[i], Row) or isinstance(v[i], Struct):
                     v[i] = v[i].dict()
             kwargs[k] = v
 

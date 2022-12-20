@@ -87,22 +87,5 @@ for user in users:
 
 ```
 
-TODO:
-- [x] add a way to specify the database name
-- [x] Table class
-- [x] Row class
-- [x] add Table func
-- [x] get Table func
-- [x] update Table func
-- [x] delete Table func
-- [x] update Row func
-- [x] delete Row func
-- [x] get_first Table func
-- [x] get_last Table func
-- [x] get_all Table func
-- [x] MWBase.table("name").get_one(...)
-- [x] clear Table func
-- [x] class Where
-- [x] class Order (ASC, DESC)
 
 
