@@ -3,8 +3,9 @@ import json
 # This Python file uses the following encoding: utf-8
 import sqlite3
 
-from ._types import PY_VAR_TO_SQL_TYPE, Struct, Where, Order, InvalidColumnNameError, DESC, ASC, Limit
+from ._types import Struct, Where, Order, InvalidColumnNameError, DESC, ASC, Limit
 from .utils import tuple_to_dict
+from .sql_compile import SQLCompile
 
 def ensure_connection(func):
     def inner(*args, **kwargs):
@@ -26,23 +27,32 @@ def ensure_connection(func):
            
     return inner
     
-def check_kwargs(kwargs):
-    for k, v in kwargs.items():
-        if isinstance(v, Row) or isinstance(v, Struct):
-            kwargs[k] = v.dict()
+    
+def check_list(lst: list):
+    for i in range(len(lst)):
+        if isinstance(lst[i], Row) or isinstance(lst[i], Struct):
+            lst[i] = check_dict(lst[i].dict())
+        elif isinstance(lst[i], list):
+            lst[i] = check_list(lst[i])
+    return lst
 
+def check_dict(dct: dict):
+    for k, v in dct.items():
+        if isinstance(v, Row) or isinstance(v, Struct):
+            dct[k] = check_dict(v.dict())
         elif isinstance(v, list):
-            for i in range(len(v)):
-                if isinstance(v[i], Row) or isinstance(v[i], Struct):
-                    v[i] = v[i].dict()
-            kwargs[k] = v
+            dct[k] = check_list(v)
+    return dct
+
+def check_kwargs(kwargs: dict):
+    kwargs = check_dict(kwargs)
 
     for k, v in kwargs.items():
         if isinstance(v, list) or isinstance(v, dict):
             kwargs[k] = json.dumps(v)
     
     return kwargs
-
+    
     
 class MWBase():
     @ensure_connection
@@ -54,8 +64,11 @@ class MWBase():
         for table in self.tables:
             if "id" in self.tables[table].keys():
                 raise Exception("You can't use 'id' as column name")
-                
-            cursor.execute(f"CREATE TABLE IF NOT EXISTS {table} (id INTEGER PRIMARY KEY AUTOINCREMENT, {', '.join([f'{column} {PY_VAR_TO_SQL_TYPE[self.tables[table][column]]}' for column in self.tables[table]])})")
+
+            cmd = SQLCompile.create(table, self.tables[table].keys())
+            print(cmd)
+            cursor.execute(cmd)
+
             self.__setattr__(table, Table(table, self.tables[table], self))
 
     def table(self, table: str) -> Table:
@@ -89,9 +102,9 @@ class Table:
         """
         kwargs = check_kwargs(kwargs)
 
-        cmd = f"INSERT INTO {self.table} ({', '.join(kwargs)}) VALUES ({', '.join([f'?' for i in kwargs])})"
+        cmd = SQLCompile.insert(self.table, kwargs.keys())
         values = tuple(map(str, kwargs.values()))
-
+        print(cmd, values)
         cursor.execute(cmd, values)
     
     @ensure_connection
@@ -102,7 +115,7 @@ class Table:
         if order:
             return self.get(order=order)
 
-        cmd = f"SELECT * FROM {self.table}"
+        cmd = SQLCompile.select(self.table)
 
         cursor.execute(cmd)
         items = cursor.fetchall()
@@ -116,7 +129,7 @@ class Table:
         return resp
 
     @ensure_connection
-    def get(self, order: Order = Order(), where: Where = Where(), cursor=None, **kwargs) -> list[Row]:
+    def get(self, order: Order = Order(), where: Where = Where(), distinct: bool=False, cursor=None, **kwargs) -> list[Row]:
         """
         Get rows from table.
         ```python
@@ -145,22 +158,27 @@ class Table:
         
         if not all([k in self.columns.keys() and v in [DESC, ASC] for k, v in order.items()]):
             raise InvalidColumnNameError("Order keys must be in columns keys and values must be DESC or ASC")
-        
-        # ORDER BY Country ASC, CustomerName DESC
 
-        cmd = (
-            f"SELECT * FROM {self.table}"
-            ) + (
-            f" WHERE {' AND '.join([f'{column} = ?' if str(data)[0] not in ['>', '<', '='] else f'{column} {str(data)[0]} ?' for column, data in kwargs.items()])}" if kwargs else ""
-            ) + (
-            f" ORDER BY {', '.join([f'{column} {data}' for column, data in order.items()])}" if order else ""
+        if where:
+            kwargs.update(where)
+
+        cmd = SQLCompile.select(
+            DISTINCT="DISTINCT" if distinct else "",
+            table=self.table, 
+            where=[
+                f"{column} { (str(data)[0] if str(data)[0] in ['>', '<', '='] else '=') } ?" 
+                for column, data in kwargs.items()] if kwargs else ["NONE"], 
+            order=[
+                f'{column} {data}' 
+            for column, data in order.items()] if order else ["NONE"],
         )
-        values = tuple(
-            map(str, 
-            [ str(x)[1:] if str(x)[0] in ['>', '<', '='] else x for x in list(kwargs.values()) ] 
-        ))
-
-
+        values = tuple(map(str, [
+            # Where(id=">1") -> "1"
+            # Where(id = 1) -> 1
+            x if str(x)[0] not in ['>', '<', '='] else x[1:] 
+            for x in list(kwargs.values())
+        ]))
+        print(cmd, values)
         cursor.execute(cmd, values)
         items = cursor.fetchall()
 
@@ -173,19 +191,47 @@ class Table:
         return resp
 
     @ensure_connection
-    def get_one(self, where: Where = {}, default_index=0, cursor=None, **kwargs, ) -> Row | None:
+    def get_one(self, where: Where = Where(), order: Order = Order(), default_index: int=0, distinct: bool=False, cursor=None, **kwargs, ) -> Row | None:
         """
         Get one row from table.
         """
+        if isinstance(order, Where) and isinstance(where, Order):
+            order, where = where, order
+
+        elif isinstance(order, Where) and isinstance(where, Where): 
+            where.update(order)
+            order = Order()
+
+        elif isinstance(order, Order) and isinstance(where, Order):
+            order.update(where)
+            where = Where()
+
+        if where: kwargs.update(where)
+
+        
+        if not all([k in self.columns.keys() and v in [DESC, ASC] for k, v in order.items()]):
+            raise InvalidColumnNameError("Order keys must be in columns keys and values must be DESC or ASC")
+
         if where:
             kwargs.update(where)
 
-        cmd = f"SELECT * FROM {self.table} WHERE {' AND '.join([f'{column} = ?' if str(data)[0] not in ['>', '<', '='] else f'{column} {str(data)[0]} ?' for column, data in kwargs.items()])}"
-        values = tuple(
-            map(str, 
-            [ str(x)[1:] if str(x)[0] in ['>', '<', '='] else x for x in list(kwargs.values()) ] 
-        ))
-
+        cmd = SQLCompile.select(
+            DISTINCT="DISTINCT" if distinct else "",
+            table=self.table, 
+            where=[
+                f"{column} { (str(data)[0] if str(data)[0] in ['>', '<', '='] else '=') } ?" 
+                for column, data in kwargs.items()] if kwargs else ["NONE"], 
+            order=[
+                f'{column} {data}' 
+            for column, data in order.items()] if order else ["NONE"],
+        )
+        values = tuple(map(str, [
+            # Where(id=">1") -> "1"
+            # Where(id = 1) -> 1
+            x if str(x)[0] not in ['>', '<', '='] else x[1:] 
+            for x in list(kwargs.values())
+        ]))
+        print(cmd, values)
         cursor.execute(cmd, values)
         item = cursor.fetchall()
 
@@ -217,11 +263,21 @@ class Table:
         """
         kwargs = check_kwargs(kwargs)
 
-        cmd = f"UPDATE {self.table} SET {', '.join([f'{column} = ?' for column in kwargs])} WHERE {' AND '.join([f'{column} = ?' if str(data)[0] not in ['>', '<', '='] else f'{column} {str(data)[0]} ?' for column, data in where.items()])}"
-        values = tuple(
-            map(str, 
-            list(kwargs.values()) + [str(x)[1:] if x != "" and (str(x)[0]) in ['>', '<', '='] else x for x in list(where.values())]
-        ))
+        cmd = SQLCompile.update(
+            table = self.table, 
+            fields = [f'{column} = ?' for column in kwargs], 
+            # Where(id=">1") -> id > 1
+            # Where(id = 1) -> id = 1
+            where = [f'{column}' + (str(data)[0] if str(data)[0] in ['>', '<', '='] else '=') + '?' for column, data in where.items()]
+        )
+
+        values = tuple(map(str, 
+            list(kwargs.values()) + [
+            # Where(id=">1") -> "1"
+            # Where(id = 1) -> 1
+            x if str(x)[0] not in ['>', '<', '='] else x[1:] 
+            for x in list(where.values())
+        ]))
 
         cursor.execute(cmd, values)
 
@@ -230,11 +286,16 @@ class Table:
         """
         Delete rows from table.
         """
-        cmd = f"DELETE FROM {self.table} WHERE {' AND '.join([f'{column} = ?' if str(data)[0] not in ['>', '<', '='] else f'{column} {str(data)[0]} ?' for column, data in kwargs.items()])}"
-        values = tuple(
-            map(str, 
-            [str(x)[1:] if x != "" and (str(x)[0]) in ['>', '<', '='] else x for x in list(kwargs.values())]
-        ))
+        cmd = SQLCompile.delete(
+            table = self.table,
+            where = [f'{column}' + (str(data)[0] if str(data)[0] in ['>', '<', '='] else '=') + '?' for column, data in kwargs.items()]
+        )
+        values = tuple(map(str, [
+            # Where(id=">1") -> "1"
+            # Where(id = 1) -> 1
+            x if str(x)[0] not in ['>', '<', '='] else x[1:] 
+            for x in list(kwargs.values())
+        ]))
 
         cursor.execute(cmd, values)
     
@@ -243,7 +304,7 @@ class Table:
         """
         Delete all rows from table.
         """
-        cmd = f"DELETE FROM {self.table}"
+        cmd = SQLCompile.delete(table=self.table)
 
         cursor.execute(cmd)
     
@@ -288,10 +349,10 @@ class Row(Struct):
         """
         Update row in table.
         """
+        self.__dict__.update(kwargs)
         kwargs = check_kwargs(kwargs)
         
         self.table.update(Where(id = self.id), **kwargs)
-        self.__dict__.update(kwargs)
     
     def delete(self):
         """
@@ -299,6 +360,12 @@ class Row(Struct):
         """
         self.table.delete(id=self.id)
         self = None
+    
+    def save(self):
+        """
+        Update row in table.
+        """
+        self.update(**self.dict())
 
 
 if __name__ == "__main__":

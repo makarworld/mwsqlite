@@ -1,13 +1,4 @@
 
-PY_VAR_TO_SQL_TYPE = {
-    int: 'INTEGER',
-    float: 'REAL',
-    str: 'TEXT',
-    bool: 'TEXT',
-    list: 'TEXT',
-    dict: 'TEXT',
-}
-
 DESC = 'DESC'
 ASC = 'ASC'    
 
@@ -19,6 +10,7 @@ class Order(dict):
 
 class Limit(int):
     pass
+
 
 class Struct:
     def __init__(self, _list=[], **entries):
