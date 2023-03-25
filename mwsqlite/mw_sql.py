@@ -66,7 +66,6 @@ class MWBase():
                 raise Exception("You can't use 'id' as column name")
 
             cmd = SQLCompile.create(table, self.tables[table].keys())
-            print(cmd)
             cursor.execute(cmd)
 
             self.__setattr__(table, Table(table, self.tables[table], self))
@@ -104,7 +103,6 @@ class Table:
 
         cmd = SQLCompile.insert(self.table, kwargs.keys())
         values = tuple(map(str, kwargs.values()))
-        print(cmd, values)
         cursor.execute(cmd, values)
     
     @ensure_connection
@@ -178,7 +176,7 @@ class Table:
             x if str(x)[0] not in ['>', '<', '='] else x[1:] 
             for x in list(kwargs.values())
         ]))
-        print(cmd, values)
+
         cursor.execute(cmd, values)
         items = cursor.fetchall()
 
@@ -231,7 +229,7 @@ class Table:
             x if str(x)[0] not in ['>', '<', '='] else x[1:] 
             for x in list(kwargs.values())
         ]))
-        print(cmd, values)
+
         cursor.execute(cmd, values)
         item = cursor.fetchall()
 
