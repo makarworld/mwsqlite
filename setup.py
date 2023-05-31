@@ -35,7 +35,6 @@ setup(
         "Topic :: Communications :: Email",
         "Operating System :: OS Independent",
         "License :: OSI Approved :: MIT License",
-        "Versioning :: Semantic Versioning", 
 
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",
