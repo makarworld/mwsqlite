@@ -3,9 +3,14 @@ import json
 # This Python file uses the following encoding: utf-8
 import sqlite3
 
-from ._types import Struct, Where, Order, InvalidColumnNameError, DESC, ASC, Limit
-from .utils import tuple_to_dict
-from .sql_compile import SQLCompile
+try:
+    from ._types import Struct, Where, Order, InvalidColumnNameError, DESC, ASC, Limit
+    from .utils import tuple_to_dict
+    from .sql_compile import SQLCompile
+except:
+    from _types import Struct, Where, Order, InvalidColumnNameError, DESC, ASC, Limit
+    from utils import tuple_to_dict
+    from sql_compile import SQLCompile
 
 def ensure_connection(func):
     def inner(*args, **kwargs):
@@ -93,6 +98,15 @@ class Table:
     
     def __repr__(self):
         return f"MWBase.{self.table}"
+
+    @ensure_connection
+    def _execute(self, cmd, values, fetchall = False, cursor=None) -> None:
+        cursor.execute(cmd, values)
+        if fetchall:
+            return cursor.fetchall()
+
+    def execute(self, cmd, values = None, fetchall = False):
+        return self._execute(cmd, values, fetchall)
 
     @ensure_connection
     def add(self, cursor=None, **kwargs) -> None:
@@ -252,7 +266,54 @@ class Table:
         Get last row with parameters from table.
         """
         return self.get_one(default_index=-1, **kwargs)
+    @ensure_connection
+    def get_like(self, where: Where = Where(), order: Order = Order(), return_index: int = None, cursor=None, **kwargs) -> list[Row]:
+        
+        if isinstance(order, Where) and isinstance(where, Order):
+            order, where = where, order
 
+        elif isinstance(order, Where) and isinstance(where, Where): 
+            where.update(order)
+            order = Order()
+
+        elif isinstance(order, Order) and isinstance(where, Order):
+            order.update(where)
+            where = Where()
+
+        if where: kwargs.update(where)
+
+        
+        if not all([k in self.columns.keys() and v in [DESC, ASC] for k, v in order.items()]):
+            raise InvalidColumnNameError("Order keys must be in columns keys and values must be DESC or ASC")
+
+        if where:
+            kwargs.update(where)
+
+        cmd = SQLCompile.select(
+            table=self.table, 
+            where=[
+                f"{column} { ('LIKE') } ?" 
+                for column, data in kwargs.items()] if kwargs else ["NONE"], 
+            order=[
+                f'{column} {data}' 
+            for column, data in order.items()] if order else ["NONE"],
+        )
+        values = tuple(map(str, kwargs.values()))
+
+        cursor.execute(cmd, values)
+        items = cursor.fetchall()
+
+        if not items: return None
+
+        if not return_index:
+            resp = []
+            for item in items:
+                resp.append(Row(self, **tuple_to_dict(item, self.columns)))
+        else:
+            resp = tuple_to_dict(item[return_index], self.columns)
+            resp = Row(self, **resp)
+
+        return resp
 
     @ensure_connection
     def update(self, where: Where, cursor=None, **kwargs) -> None:
@@ -379,16 +440,23 @@ if __name__ == "__main__":
     )
 
     base.users.add(first_name="John", age=20)
+    base.users.add(first_name="Jack", age=20)
+    base.users.add(first_name="Joice", age=20)
+    base.users.add(first_name="Jumba", age=20)
+    base.users.add(first_name="Jamba", age=20)
 
-    user = base.users.get_one(first_name="John")
-    user.update(first_name="Jack", age=21)
+    #user = base.users.get_one(first_name="John")
+    #user.update(first_name="Jack", age=21)
 
-    user2 = base.users.get_one(first_name="Jack")
+    #user2 = base.users.get_one(first_name="Jack")
     
-    print(user) # user and user2 are the same object
-    print(user2)
+    #print(user) # user and user2 are the same object
+    #print(user2)
 
-    user.delete()
+    users = base.users.get_like(first_name="Joh%")
+    print(users)
+
+    [user.delete() for user in users]
 
     # UPDATE test SET test1 = ?, test2 = ? WHERE test1 = ? AND test2 = ? ['name2', 'name3', 'name1', 'name3']
 
