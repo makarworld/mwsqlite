@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 # This Python file uses the following encoding: utf-8
 import sqlite3
+from typing import List
 
 try:
     from ._types import Struct, Where, Order, InvalidColumnNameError, DESC, ASC, Limit
@@ -81,6 +82,8 @@ class MWBase():
         """
         return self.__getattribute__(table)
 
+    def __getattribute__(self, __name: str) -> Table:
+        return object.__getattribute__(self, __name)
 
 
 class Table:
@@ -120,7 +123,7 @@ class Table:
         cursor.execute(cmd, values)
     
     @ensure_connection
-    def get_all(self, order: Order = Order(), cursor=None) -> list[Row]:
+    def get_all(self, order: Order = Order(), cursor=None) -> List[Row]:
         """
         Get all rows from table.
         """
@@ -141,7 +144,7 @@ class Table:
         return resp
 
     @ensure_connection
-    def get(self, order: Order = Order(), where: Where = Where(), distinct: bool=False, cursor=None, **kwargs) -> list[Row]:
+    def get(self, order: Order = Order(), where: Where = Where(), distinct: bool=False, cursor=None, **kwargs) -> List[Row]:
         """
         Get rows from table.
         ```python
@@ -267,7 +270,7 @@ class Table:
         """
         return self.get_one(default_index=-1, **kwargs)
     @ensure_connection
-    def get_like(self, where: Where = Where(), order: Order = Order(), return_index: int = None, cursor=None, **kwargs) -> list[Row]:
+    def get_like(self, where: Where = Where(), order: Order = Order(), return_index: int = None, cursor=None, **kwargs) -> List[Row]:
         
         if isinstance(order, Where) and isinstance(where, Order):
             order, where = where, order
