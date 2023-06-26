@@ -55,7 +55,7 @@ def check_kwargs(kwargs: dict):
 
     for k, v in kwargs.items():
         if isinstance(v, list) or isinstance(v, dict):
-            kwargs[k] = json.dumps(v)
+            kwargs[k] = json.dumps(v, separators = (',', ':'))
     
     return kwargs
     
