@@ -43,6 +43,21 @@ class Struct:
     
     def dict(self):
         return self.__dict__ 
+    
+    def to_dict(self):
+        _dict = {}
+        for k, v in self.__dict__.items():
+            if isinstance(v, Struct):
+                _dict[k] = v.to_dict()
+
+            if isinstance(v, list):
+                for i in range(len(v)):
+                    if isinstance(v[i], Struct):
+                        _dict[k].append(v[i].to_dict())
+                    else:
+                        _dict[k].append(v[i])
+        return _dict
+        
 
     def __getattr__(self, item):
         return None
