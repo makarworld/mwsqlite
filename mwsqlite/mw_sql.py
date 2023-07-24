@@ -33,26 +33,7 @@ def ensure_connection(func):
            
     return inner
     
-    
-def check_list(lst: list):
-    for i in range(len(lst)):
-        if isinstance(lst[i], Row) or isinstance(lst[i], Struct):
-            lst[i] = check_dict(lst[i].dict())
-        elif isinstance(lst[i], list):
-            lst[i] = check_list(lst[i])
-    return lst
-
-def check_dict(dct: dict):
-    for k, v in dct.items():
-        if isinstance(v, Row) or isinstance(v, Struct):
-            dct[k] = check_dict(v.dict())
-        elif isinstance(v, list):
-            dct[k] = check_list(v)
-    return dct
-
 def check_kwargs(kwargs: dict):
-    kwargs = check_dict(kwargs)
-
     for k, v in kwargs.items():
         if isinstance(v, list) or isinstance(v, dict):
             kwargs[k] = json.dumps(v, separators = (',', ':'))

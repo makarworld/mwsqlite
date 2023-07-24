@@ -27,6 +27,11 @@ base = MWBase(
         "subjects": {
             "name": str,
             "teacher": str
+        },
+        "json_tests": {
+            "key": str,
+            "list_of_json": list,
+            "json": dict
         }
     }
 )
@@ -220,9 +225,51 @@ def test_order_by():
         Order(age=DESC),
     )
 
-    # user __str__ because mwsqlite use selfmade dict structure
     assert users[0].age == 21
     assert users[1].age == 20
+
+def test_json():
+    # add user to database
+    base.json_tests.add(
+        key = "test1",
+        list_of_json = [
+            {
+                "test": "test value in list column"
+            },
+            {
+                "test1": {"test2": "deep-json 1"}
+            }
+        ],
+        json = {
+            "test": {"test2": "deep-json 2"}
+        }
+    )
+
+    # get from database
+    row = base.json_tests.get_one(key="test1")
+
+    # user __str__ because mwsqlite use selfmade dict structure
+    assert row.key == "test1"
+    assert isinstance(row.list_of_json, list)
+    assert isinstance(row.list_of_json[0], dict)
+    assert isinstance(row.json, dict)
+    assert isinstance(row.json.test, dict)
+    assert row.list_of_json[0].test == "test value in list column"
+    assert row.list_of_json[1].test1.test2 == "deep-json 1"
+    assert row.json.test.test2 == "deep-json 2"
+
+    # update copy of dict
+    row.json.update(test3 = {"test4": "deep-json 3"})
+    # update dict in database
+    row.update(json = row.json)
+
+    # get from database
+    row = base.json_tests.get_one(key="test1")
+
+    assert row.json.test3.test4 == "deep-json 3"
+
+
+test_json()
 
 test_base_add_to_test_table()
 
@@ -239,7 +286,6 @@ test_update_subject()
 test_delete_subject()
 
 test_order_by()
-
 
 """
 users = base.users.get(

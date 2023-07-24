@@ -12,7 +12,7 @@ class Limit(int):
     pass
 
 
-class Struct:
+class __Struct:
     def __init__(self, _list=[], **entries):
         if _list:
             self.new_list = []
@@ -76,6 +76,20 @@ class Struct:
     
     def get(self, key):
         return self.__dict__.get(key)
+
+class Struct(dict):
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+    def __getattr__(cls, key):
+        item = cls.get(key)
+        if isinstance(item, dict):
+            item = Struct(**item)
+        elif isinstance(item, list):
+            for i in range(len(item)):
+                if isinstance(item[i], dict):
+                    item[i] = Struct(**item[i])
+        return item
 
 class InvalidColumnNameError(Exception):
     pass
